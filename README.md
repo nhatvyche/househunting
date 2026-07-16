@@ -2,6 +2,8 @@
 
 A per-user property listing tracker built as a **separate prototype** from the existing Gmail + Google Sheets system.
 
+Full intended workflow (find → manage users/groups → review): see [`WORKFLOW.md`](./WORKFLOW.md).
+
 ## What it does
 
 - **Shared inbox**: Users email listings to one address (e.g. `househunting.betatest@gmail.com`)
