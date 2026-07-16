@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 export function SubmitForm() {
   const router = useRouter();
   const [url, setUrl] = useState("");
+  const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,13 +21,14 @@ export function SubmitForm() {
       const response = await fetch("/api/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, notes, source: "web" }),
+        body: JSON.stringify({ url, address, notes, source: "web" }),
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Failed to save listing");
 
       setUrl("");
+      setAddress("");
       setNotes("");
       router.push("/dashboard");
       router.refresh();
@@ -50,6 +52,20 @@ export function SubmitForm() {
           placeholder="https://www.zillow.com/homedetails/..."
           value={url}
           onChange={(e) => setUrl(e.target.value)}
+          className="w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="address" className="mb-1.5 block text-sm font-medium">
+          Address <span className="font-normal text-[var(--muted)]">(for map — copy from Realtor)</span>
+        </label>
+        <input
+          id="address"
+          type="text"
+          placeholder="123 Main St, Austin, TX 78701"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
           className="w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
         />
       </div>

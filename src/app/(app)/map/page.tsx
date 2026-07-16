@@ -16,6 +16,7 @@ export default async function MapPage({
 
   const items = (listings ?? []) as Listing[];
   const mappable = items.filter((l) => l.lat != null && l.lng != null);
+  const pending = items.length - mappable.length;
 
   return (
     <div>
@@ -24,6 +25,12 @@ export default async function MapPage({
         <p className="mt-1 text-sm text-[var(--muted)]">
           Showing {mappable.length} of {items.length} listings with location data
         </p>
+        {pending > 0 && (
+          <p className="mt-2 text-sm text-amber-800">
+            {pending} listing{pending === 1 ? "" : "s"} missing a map pin — re-add with an address on
+            the Add page, or enable AI parsing with <code className="rounded bg-amber-100 px-1">ANTHROPIC_API_KEY</code>.
+          </p>
+        )}
       </div>
       <MapView listings={items} focusId={focus ?? null} />
     </div>
