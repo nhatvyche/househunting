@@ -20,53 +20,110 @@ export function extractListingUrl(subject: string, body: string): string | null 
   return listingUrl ?? urls[0] ?? null;
 }
 
+/** Turn "San-Jose" / "McLaughlin-Ave" into spaced words. */
+function unslug(part: string): string {
+  return part.replace(/-+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Realtor.com paths look like:
+ * /rentals/details/1150-McLaughlin-Ave_San-Jose_CA_95122_M17828-21201
+ * /realestateandhomes-detail/123-Main-St_Austin_TX_78701_M12345-67890
+ */
+function extractFromRealtorSlug(pathname: string): ParsedListingData | null {
+  const segment = pathname.split("/").filter(Boolean).pop() ?? "";
+  // street_city_ST_ZIP_M...
+  const match = segment.match(
+    /^(\d[\w-]*)_([A-Za-z][\w-]*)_([A-Za-z]{2})_(\d{5})(?:-\d{4})?(?:_M[\w-]+)?$/i,
+  );
+  if (!match) return null;
+
+  const address = unslug(match[1]);
+  const city = unslug(match[2]);
+  const state = match[3].toUpperCase();
+  const zip = match[4];
+
+  return {
+    title: `${address}, ${city}, ${state} ${zip}`,
+    address,
+    city,
+    state,
+    zip,
+  };
+}
+
 /** Best-effort parse of street/city/state/zip from common listing URL paths. */
 export function extractAddressFromUrl(url: string): ParsedListingData | null {
   try {
     const { pathname, hostname } = new URL(url);
+
+    if (hostname.includes("realtor.com")) {
+      const realtor = extractFromRealtorSlug(pathname);
+      if (realtor) return realtor;
+    }
+
+    // Keep underscores as separators first (Realtor / some aggregators)
+    const underscoreParts = (pathname.split("/").filter(Boolean).pop() ?? "").split("_");
+    if (underscoreParts.length >= 4) {
+      const zipIdx = underscoreParts.findIndex((p) => /^\d{5}(?:-\d{4})?$/.test(p));
+      const stateIdx = zipIdx > 0 ? zipIdx - 1 : -1;
+      if (
+        zipIdx >= 2 &&
+        stateIdx >= 1 &&
+        /^[A-Za-z]{2}$/.test(underscoreParts[stateIdx])
+      ) {
+        const address = unslug(underscoreParts.slice(0, stateIdx - 1).join(" "));
+        const city = unslug(underscoreParts[stateIdx - 1]);
+        const state = underscoreParts[stateIdx].toUpperCase();
+        const zip = underscoreParts[zipIdx].slice(0, 5);
+        if (address && city) {
+          return {
+            title: `${address}, ${city}, ${state} ${zip}`,
+            address,
+            city,
+            state,
+            zip,
+          };
+        }
+      }
+    }
+
     const slug = decodeURIComponent(pathname)
       .replace(/\+/g, " ")
       .replace(/[_-]+/g, " ")
       .replace(/\s+/g, " ")
       .trim();
 
-    // e.g. "123 Main St Austin TX 78701" somewhere in the path
+    // e.g. "123 Main St Austin TX 78701"
     const match = slug.match(
-      /(\d{1,6}\s+[A-Za-z0-9 .'#]+?\s+(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Dr|Drive|Ln|Lane|Ct|Court|Way|Pl|Place|Ter|Terrace|Cir|Circle)\b[^/]*?\b([A-Z]{2})\s+(\d{5})(?:-\d{4})?)/i,
+      /(\d{1,6}\s+[A-Za-z0-9 .'#]+?\s+(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard|Dr|Drive|Ln|Lane|Ct|Court|Way|Pl|Place|Ter|Terrace|Cir|Circle)\.?)(?:\s+([A-Za-z .]+?))?\s+([A-Z]{2})\s+(\d{5})(?:-\d{4})?/i,
     );
 
-    if (!match) {
-      // Realtor / Zillow style: City_ST_Zip near end
-      const cityStateZip = slug.match(
-        /([A-Za-z .]+)\s+([A-Z]{2})\s+(\d{5})(?:-\d{4})?/i,
-      );
-      if (!cityStateZip) return null;
+    if (match) {
       return {
-        title: hostname,
-        city: cityStateZip[1].trim(),
-        state: cityStateZip[2].toUpperCase(),
-        zip: cityStateZip[3],
-        address: null,
+        title: [match[1], match[2], match[3], match[4]].filter(Boolean).join(", "),
+        address: match[1].trim(),
+        city: match[2]?.trim() || null,
+        state: match[3].toUpperCase(),
+        zip: match[4],
       };
     }
 
-    const full = match[1].trim();
-    const state = match[2].toUpperCase();
-    const zip = match[3];
-    const beforeState = full.replace(new RegExp(`\\s*${state}\\s*${zip}.*$`, "i"), "").trim();
-    const streetMatch = beforeState.match(/^(.+?)(?:\s+([A-Za-z .]+))?$/);
+    const cityStateZip = slug.match(/([A-Za-z .]+)\s+([A-Z]{2})\s+(\d{5})(?:-\d{4})?/i);
+    if (!cityStateZip) return null;
 
     return {
-      title: beforeState || hostname,
-      address: streetMatch?.[1] ?? beforeState,
-      city: streetMatch?.[2]?.trim() || null,
-      state,
-      zip,
+      title: hostname,
+      city: cityStateZip[1].trim(),
+      state: cityStateZip[2].toUpperCase(),
+      zip: cityStateZip[3],
+      address: null,
     };
   } catch {
     return null;
   }
 }
+
 
 export async function parseListingWithAI(
   url: string,
