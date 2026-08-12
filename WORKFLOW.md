@@ -16,11 +16,11 @@ This document describes the intended end-to-end workflow for the HouseHunting pr
 | User finds a property listing | Done | Outside the app (Realtor, Zillow, etc.) |
 | User sends the URL to a dedicated email address | Partial | Shared inbox supported via Apps Script; Chrome extension still points at old system until updated |
 | The system receives the email | Partial | `scripts/gmail-ingest.gs` → `POST /api/ingest` |
-| The system uses AI to get listing data from the webpage | Partial | Claude parsing when `ANTHROPIC_API_KEY` is set; otherwise URL-only / manual address |
+| The system uses AI to get listing data from the webpage | Partial | Claude when `ANTHROPIC_API_KEY` is set; URL path heuristics + optional manual address as fallback |
 | The system enters that listing data into the database | Done | Saved to Supabase `listings` with `user_id` (who submitted) |
 
 ### Current alternate path (for beta testing)
-Users can also paste a listing URL (and optional address) on **Add** (`/submit`) without email.
+Users can paste a listing URL (and optional address) on **Add** (`/submit`) without email.
 
 ### Target email flow
 ```
@@ -56,18 +56,20 @@ Find listing → email URL to shared inbox
 | Step | Status | Notes |
 |------|--------|--------|
 | The user logs into the system | Done | `/login` magic link |
-| List view of listings | Partial | `/dashboard` shows the user’s listings (not group listings yet) |
-| Map view of listings | Partial | `/map` shows user’s listings with lat/lng |
-| Select a listing to view details | Partial | Card + open original URL; no dedicated detail page yet |
+| List view of listings | Done | Dashboard with beds/baths/sqft + sort/filter |
+| Map view of listings | Done | Carto light tiles; pin popup shows facts + directions |
+| Select a listing to view details | Done | `/listings/[id]` detail page |
 | Update the status of any listing | Planned | Need status UI (interested / visiting / offer / rejected, etc.) |
-| Add comments to any listing | Planned | Need `comments` table + UI |
+| Add comments to any listing | Done | Comments on detail page |
 | Delete any listing | Planned | Need delete action in UI (RLS already allows delete) |
+| Open device maps for driving directions | Done | Google Maps + Apple Maps links from map popup / detail |
+| Sort and filter the list | Done | Search, min beds, max price, sort options |
 
 ### Current review flow
 ```
-Login → Dashboard (list)
-     → Map (pins for geocoded listings)
-     → Open original listing site
+Login → Dashboard (list + sort/filter)
+     → Listing detail (facts + comments + directions)
+     → Map (pins, popup facts, Get directions)
 ```
 
 ---
@@ -79,26 +81,27 @@ Login → Dashboard (list)
 - Record who submitted each listing
 - Private per-user list + map
 - Manual URL submit + optional email ingest
+- Listing facts on cards/map, comments, directions, sort/filter
 - Gather feedback from known testers
 
 ### Next version (after feedback)
 - Groups / household sharing
 - Invite + validation emails
-- Listing detail page
 - Status updates
-- Comments
 - Delete listing + close account
-- Stronger AI parsing by default
+- Stronger AI parsing by default (URL alone always fills beds/baths/sqft)
 
 ---
 
 ## Suggested test path for beta testers
 
 1. Create account with the email you will send listings from  
-2. Add a listing via **Add** (URL + address)  
-3. Confirm it appears on **Dashboard** and **Map**  
-4. (Optional) Email a listing URL to the shared inbox and wait for ingest  
-5. Share feedback: what you expected from **groups**, **status**, and **comments**
+2. Add a listing via **Add** (URL; address optional if AI is on)  
+3. Confirm beds/baths/sqft on **Dashboard** cards  
+4. Open **Map** → tap pin → **Get directions**  
+5. Open listing detail → add a **comment**  
+6. Try **sort/filter** on the dashboard  
+7. Share feedback: groups, status, AI quality  
 
 ---
 
@@ -107,7 +110,9 @@ Login → Dashboard (list)
 | Area | Location |
 |------|----------|
 | Schema | `supabase/schema.sql` |
+| Comments migration | `supabase/migrations/002_comments.sql` |
 | Email ingest API | `src/app/api/ingest/route.ts` |
 | Web submit API | `src/app/api/listings/route.ts` |
+| Comments API | `src/app/api/listings/[id]/comments/route.ts` |
 | Gmail Apps Script | `scripts/gmail-ingest.gs` |
-| Dashboard / Map / Submit | `src/app/(app)/` |
+| Dashboard / Map / Submit / Detail | `src/app/(app)/` |

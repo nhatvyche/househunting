@@ -38,3 +38,11 @@ export interface ParsedListingData {
   lng?: number | null;
   notes?: string | null;
 }
+
+export interface ListingComment {
+  id: string;
+  listing_id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+}

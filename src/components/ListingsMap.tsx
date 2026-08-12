@@ -4,7 +4,15 @@ import { useEffect } from "react";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { Listing } from "@/lib/types";
-import { formatPrice, listingLabel } from "@/lib/format";
+import {
+  appleMapsUrl,
+  directionsUrl,
+  formatBaths,
+  formatBeds,
+  formatPrice,
+  formatSqft,
+  listingLabel,
+} from "@/lib/format";
 import "leaflet/dist/leaflet.css";
 
 const defaultIcon = L.icon({
@@ -70,10 +78,7 @@ export function ListingsMap({
     );
   }
 
-  const center: [number, number] = [
-    mappable[0].lat!,
-    mappable[0].lng!,
-  ];
+  const center: [number, number] = [mappable[0].lat!, mappable[0].lng!];
 
   return (
     <div className="h-[480px] overflow-hidden rounded-xl border border-[var(--border)] shadow-sm">
@@ -83,9 +88,10 @@ export function ListingsMap({
         scrollWheelZoom
         className="h-full w-full"
       >
+        {/* Carto Positron: cleaner basemap, fewer red highway exit labels */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
         <FitBounds listings={mappable} />
         <FocusMarker listing={focusListing} />
@@ -96,17 +102,55 @@ export function ListingsMap({
             icon={defaultIcon}
           >
             <Popup>
-              <div className="space-y-1 text-sm">
+              <div className="min-w-[180px] space-y-1.5 text-sm">
                 <p className="font-semibold">{listingLabel(listing)}</p>
-                <p>{formatPrice(listing.price)}</p>
-                <a
-                  href={listing.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  Open listing
-                </a>
+                <p className="font-medium text-[var(--primary)]">
+                  {formatPrice(listing.price)}
+                </p>
+                <p className="text-[var(--muted)]">
+                  {formatBeds(listing.bedrooms)} · {formatBaths(listing.bathrooms)} ·{" "}
+                  {formatSqft(listing.sqft)}
+                </p>
+                <div className="flex flex-col gap-1 pt-1">
+                  <a
+                    href={directionsUrl(
+                      listing.lat!,
+                      listing.lng!,
+                      listing.address || listingLabel(listing),
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 hover:underline"
+                  >
+                    Get directions
+                  </a>
+                  <a
+                    href={appleMapsUrl(
+                      listing.lat!,
+                      listing.lng!,
+                      listing.address || listingLabel(listing),
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Open in Apple Maps
+                  </a>
+                  <a
+                    href={listing.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Open listing
+                  </a>
+                  <a
+                    href={`/listings/${listing.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Details & comments
+                  </a>
+                </div>
               </div>
             </Popup>
           </Marker>

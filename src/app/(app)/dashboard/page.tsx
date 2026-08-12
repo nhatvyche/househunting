@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { ListingCard } from "@/components/ListingCard";
+import { ListingsBoard } from "@/components/ListingsBoard";
 import type { Listing } from "@/lib/types";
 
 export default async function DashboardPage() {
@@ -20,6 +20,15 @@ export default async function DashboardPage() {
   }
 
   const items = (listings ?? []) as Listing[];
+
+  const { data: comments } = await supabase
+    .from("listing_comments")
+    .select("listing_id");
+
+  const commentCounts: Record<string, number> = {};
+  for (const row of comments ?? []) {
+    commentCounts[row.listing_id] = (commentCounts[row.listing_id] ?? 0) + 1;
+  }
 
   return (
     <div>
@@ -43,7 +52,7 @@ export default async function DashboardPage() {
         <div className="rounded-xl border border-dashed border-[var(--border)] bg-white p-12 text-center">
           <p className="text-[var(--muted)]">No listings yet.</p>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Email a listing URL to the shared inbox, or add one manually.
+            Paste a listing URL (and address if needed), or email the shared inbox.
           </p>
           <Link
             href="/submit"
@@ -53,11 +62,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {items.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
-          ))}
-        </div>
+        <ListingsBoard listings={items} commentCounts={commentCounts} />
       )}
     </div>
   );
