@@ -36,8 +36,13 @@ export async function POST(request: Request) {
   const resolvedAddress = parsed.address ?? address;
   let status = aiStatus;
 
-  if (!lat && resolvedAddress) {
-    const coords = await geocodeAddress(resolvedAddress);
+  if (!lat && (resolvedAddress || parsed.city || parsed.zip)) {
+    const coords = await geocodeAddress(
+      resolvedAddress || "",
+      parsed.city,
+      parsed.state,
+      parsed.zip,
+    );
     if (coords) {
       lat = coords.lat;
       lng = coords.lng;

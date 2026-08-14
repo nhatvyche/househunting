@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { MapView } from "@/components/MapView";
+import { backfillListingsFromUrls } from "@/lib/backfill-listings";
 import type { Listing } from "@/lib/types";
 
 export default async function MapPage({
@@ -14,7 +15,7 @@ export default async function MapPage({
     .select("*")
     .order("created_at", { ascending: false });
 
-  const items = (listings ?? []) as Listing[];
+  const items = await backfillListingsFromUrls((listings ?? []) as Listing[]);
   const mappable = items.filter((l) => l.lat != null && l.lng != null);
   const pending = items.length - mappable.length;
 
@@ -27,8 +28,7 @@ export default async function MapPage({
         </p>
         {pending > 0 && (
           <p className="mt-2 text-sm text-amber-800">
-            {pending} listing{pending === 1 ? "" : "s"} missing a map pin — re-add with an address on
-            the Add page, or enable AI parsing with <code className="rounded bg-amber-100 px-1">ANTHROPIC_API_KEY</code>.
+            {pending} listing{pending === 1 ? "" : "s"} still missing a map pin. Open Dashboard once to fill addresses from Realtor URLs, or paste the street address on Add.
           </p>
         )}
       </div>

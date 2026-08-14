@@ -15,6 +15,7 @@ import {
   listingLabel,
 } from "@/lib/format";
 import type { Listing, ListingComment } from "@/lib/types";
+import { backfillListingsFromUrls } from "@/lib/backfill-listings";
 
 export default async function ListingDetailPage({
   params,
@@ -32,7 +33,7 @@ export default async function ListingDetailPage({
 
   if (error || !listing) notFound();
 
-  const item = listing as Listing;
+  const [item] = await backfillListingsFromUrls([listing as Listing], 1);
 
   const { data: comments } = await supabase
     .from("listing_comments")

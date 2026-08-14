@@ -31,10 +31,10 @@ function unslug(part: string): string {
  * /realestateandhomes-detail/123-Main-St_Austin_TX_78701_M12345-67890
  */
 function extractFromRealtorSlug(pathname: string): ParsedListingData | null {
-  const segment = pathname.split("/").filter(Boolean).pop() ?? "";
-  // street_city_ST_ZIP_M...
+  const segment = decodeURIComponent(pathname.split("/").filter(Boolean).pop() ?? "");
+  // Do not use \\w here — it includes underscore and can swallow the whole slug.
   const match = segment.match(
-    /^(\d[\w-]*)_([A-Za-z][\w-]*)_([A-Za-z]{2})_(\d{5})(?:-\d{4})?(?:_M[\w-]+)?$/i,
+    /^(\d[A-Za-z0-9-]*)_([A-Za-z][A-Za-z0-9-]*)_([A-Za-z]{2})_(\d{5})(?:-\d{4})?(?:_[A-Za-z0-9-]+)?$/i,
   );
   if (!match) return null;
 
@@ -191,23 +191,42 @@ export async function geocodeAddress(
   const parts = [address, city, state, zip].filter(Boolean);
   if (parts.length === 0) return null;
 
-  const query = encodeURIComponent(parts.join(", "));
+  const query = parts.join(", ");
+  const encoded = encodeURIComponent(query);
+
   try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
+    const nominatim = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
       {
-        headers: { "User-Agent": "HouseHunting/1.0 (prototype)" },
+        headers: {
+          "User-Agent": "HouseHunting/1.0 (https://househunt-beta.vercel.app)",
+          Accept: "application/json",
+        },
       },
     );
-    if (!response.ok) return null;
+    if (nominatim.ok) {
+      const results = await nominatim.json();
+      if (results?.[0]) {
+        return {
+          lat: parseFloat(results[0].lat),
+          lng: parseFloat(results[0].lon),
+        };
+      }
+    }
+  } catch {
+    // try Photon next
+  }
 
-    const results = await response.json();
-    if (!results?.[0]) return null;
-
-    return {
-      lat: parseFloat(results[0].lat),
-      lng: parseFloat(results[0].lon),
-    };
+  try {
+    const photon = await fetch(
+      `https://photon.komoot.io/api/?q=${encoded}&limit=1`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!photon.ok) return null;
+    const data = await photon.json();
+    const coords = data?.features?.[0]?.geometry?.coordinates;
+    if (!Array.isArray(coords) || coords.length < 2) return null;
+    return { lng: Number(coords[0]), lat: Number(coords[1]) };
   } catch {
     return null;
   }
@@ -259,5 +278,36 @@ export async function enrichListing(
   return {
     data,
     status: fromAi || (hasFacts && data.lat != null) ? "parsed" : hasFacts ? "parsed" : "pending",
+  };
+}
+
+/** Fill missing address fields from a Realtor/Zillow-style URL (does not geocode). */
+export function hydrateListingFromUrl<T extends { url: string; title?: string | null; address?: string | null; city?: string | null; state?: string | null; zip?: string | null }>(
+  listing: T,
+): T {
+  const parsed = extractAddressFromUrl(listing.url);
+  if (!parsed) return listing;
+
+  const hostname = (() => {
+    try {
+      return new URL(listing.url).hostname.replace(/^www\./, "");
+    } catch {
+      return "";
+    }
+  })();
+
+  const titleIsPlaceholder =
+    !listing.title ||
+    listing.title === hostname ||
+    listing.title === `www.${hostname}` ||
+    listing.title.includes("realtor.com");
+
+  return {
+    ...listing,
+    title: titleIsPlaceholder ? parsed.title ?? listing.title : listing.title,
+    address: listing.address || parsed.address || null,
+    city: listing.city || parsed.city || null,
+    state: listing.state || parsed.state || null,
+    zip: listing.zip || parsed.zip || null,
   };
 }

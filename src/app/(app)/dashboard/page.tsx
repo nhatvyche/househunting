@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ListingsBoard } from "@/components/ListingsBoard";
+import { backfillListingsFromUrls } from "@/lib/backfill-listings";
 import type { Listing } from "@/lib/types";
 
 export default async function DashboardPage() {
@@ -19,7 +20,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const items = (listings ?? []) as Listing[];
+  const items = await backfillListingsFromUrls((listings ?? []) as Listing[]);
 
   const { data: comments } = await supabase
     .from("listing_comments")
